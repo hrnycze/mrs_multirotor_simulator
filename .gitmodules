@@ -1,0 +1,3 @@
+[submodule "extern/ueds-connector"]
+	path = extern/ueds-connector
+	url = git@mrs.felk.cvut.cz:uav/ueds-connector.git
