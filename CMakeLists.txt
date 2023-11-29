@@ -4,6 +4,8 @@ project(mrs_multirotor_simulator)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+
 add_definitions(-Wall)
 add_definitions(-Wextra)
 
@@ -35,11 +37,12 @@ set(LIBRARIES
   MrsMultirotorSimulator_Simulator
   MrsMultirotorSimulator_SimulatorSystemRos
   MrsMultirotorSimulator_HwApiPlugin
+  ${LIB_UEDS_CONNECTOR}
   )
 
 catkin_package(
   LIBRARIES ${LIBRARIES}
-  INCLUDE_DIRS include include/mrs_multirotor_simulator include/mrs_multirotor_simulator/uav_system include/mrs_multirotor_simulator/uav_system/controllers
+  INCLUDE_DIRS include include/mrs_multirotor_simulator include/mrs_multirotor_simulator/uav_system include/mrs_multirotor_simulator/uav_system/controllers extern/ueds-connector/include/ueds-connector
   CATKIN_DEPENDS ${CATKIN_DEPENDENCIES}
   )
 
@@ -48,9 +51,28 @@ include_directories(
   include/mrs_multirotor_simulator
   include/mrs_multirotor_simulator/uav_system
   include/mrs_multirotor_simulator/uav_system/controllers
+  extern/ueds-connector/include
   ${catkin_INCLUDE_DIRS}
   ${dynamic_reconfigure_PACKAGE_PATH}/cmake/cfgbuild.cmake
   )
+
+# udes-connector library
+set(LIB_UEDS_CONNECTOR ueds-connector)
+set(PATH_SRC extern/ueds-connector/src)
+set(SOURCES ${PATH_SRC}/socket-client.cpp ${PATH_SRC}/drone-controller.cpp ${PATH_SRC}/game-mode-controller.cpp)
+
+add_library(${LIB_UEDS_CONNECTOR} OBJECT ${SOURCES})
+target_include_directories(${LIB_UEDS_CONNECTOR} PUBLIC extern/ueds-connector/include)
+
+# add_dependencies(${LIB_UEDS_CONNECTOR} 
+#   ${${PROJECT_NAME}_EXPORTED_TARGETS}
+#   ${catkin_EXPORTED_TARGETS}
+#   )
+
+# target_link_libraries(${LIB_UEDS_CONNECTOR} 
+#   ${catkin_LIBRARIES}
+#   ${Eigen_LIBRARIES}
+#   )
 
 # ROS Wrapper for the Multirotor UAV System + controllers
 
@@ -82,6 +104,7 @@ add_dependencies(MrsMultirotorSimulator_Simulator
 
 target_link_libraries(MrsMultirotorSimulator_Simulator
   MrsMultirotorSimulator_SimulatorSystemRos
+  ${LIB_UEDS_CONNECTOR}
   ${catkin_LIBRARIES}
   ${Eigen_LIBRARIES}
   )
@@ -102,6 +125,7 @@ target_link_libraries(MrsMultirotorSimulator_HwApiPlugin
   ${catkin_LIBRARIES}
   ${Eigen_LIBRARIES}
   )
+
 
 ## --------------------------------------------------------------
 ## |                           Install                          |
