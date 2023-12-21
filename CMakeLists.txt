@@ -37,6 +37,7 @@ set(LIBRARIES
   MrsMultirotorSimulator_Simulator
   MrsMultirotorSimulator_SimulatorSystemRos
   MrsMultirotorSimulator_HwApiPlugin
+  MrsMultirotorSimulator_UedsApi
   ${LIB_UEDS_CONNECTOR}
   )
 
@@ -104,10 +105,27 @@ add_dependencies(MrsMultirotorSimulator_Simulator
 
 target_link_libraries(MrsMultirotorSimulator_Simulator
   MrsMultirotorSimulator_SimulatorSystemRos
+  MrsMultirotorSimulator_UedsApi
   ${LIB_UEDS_CONNECTOR}
   ${catkin_LIBRARIES}
   ${Eigen_LIBRARIES}
   )
+
+# Multirotor simulator
+# - ROS connector to UEds
+
+add_library(MrsMultirotorSimulator_UedsApi
+  src/drone_controller_ros.cpp
+  )
+add_dependencies(MrsMultirotorSimulator_UedsApi
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+)
+target_link_libraries(MrsMultirotorSimulator_UedsApi
+  MrsMultirotorSimulator_SimulatorSystemRos
+  ${catkin_LIBRARIES}
+  ${Eigen_LIBRARIES}
+)
 
 # Hw API Plugin
 # - pluginlib library for interfacing the Simulator with the MRS UAV System

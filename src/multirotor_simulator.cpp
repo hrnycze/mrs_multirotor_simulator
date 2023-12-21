@@ -20,6 +20,7 @@
 
 #include "ueds-connector/drone-controller.h"
 #include "ueds-connector/game-mode-controller.h"
+#include <drone_controller_ros.h>
 
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/PointField.h>
@@ -76,7 +77,7 @@ private:
 
   // | ------------------------- system ------------------------- |
 
-  std::vector<std::unique_ptr<UavSystemRos>> uavs_;
+  std::vector<std::shared_ptr<UavSystemRos>> uavs_;
 
 
 
@@ -102,23 +103,9 @@ private:
 
   // | ------------------------- unreal sim stuff ------------------------- |
 
-  std::mutex uavs_mutex;
-  std::mutex ueds_controllers_mutex;
   bool is_unreal_used_;
   std::unique_ptr<ueds_connector::GameModeController> ueds_game_controller_;
-  std::vector<std::unique_ptr<ueds_connector::DroneController>> ueds_uavs_controllers_;
-  ueds_connector::Coordinates ueds_world_frame_;
-
-  ros::Timer timer_ueds_pose_;
-  void uedsSetLocationAndRotationTimer(void);
-  ros::Timer timer_ueds_lidar_;
-  ros::Publisher pub_lidar_;
-  void uedsPublishLidarTimer();
-  ros::Timer timer_ueds_camera_;
-  ros::Publisher pub_camera_;
-  void uedsPublishCameraTimer();
-
-  std::vector<std::string> uav_names;
+  std::vector<std::unique_ptr<DroneControllerRos>> ueds_drone_controllers_;
 };
 
 //}
@@ -165,7 +152,7 @@ void MultirotorSimulator::onInit() {
 
   drs_params_.paused = false;
 
-  //std::vector<std::string> uav_names;
+  std::vector<std::string> uav_names;
 
   param_loader.loadParam("uav_names", uav_names);
 
@@ -180,8 +167,6 @@ void MultirotorSimulator::onInit() {
 
   // | ------------------------- unreal sim stuff ------------------------- |
 
-  ROS_ERROR("KUNDA");
-
   //TODO load param
   is_unreal_used_ = true;
 
@@ -190,48 +175,21 @@ void MultirotorSimulator::onInit() {
     bool connect_result = ueds_game_controller_->Connect();
     if (connect_result != 1) {
       ROS_ERROR("Unreal: Error connecting to game mode controller. connect_result was %d", connect_result);
-      is_unreal_used_ = false;
+      ros::shutdown();
     }
-  }
-
-  if(is_unreal_used_){
+  
     for (size_t i = 0; i < uav_names.size(); i++) {
       const auto [resSpawn, port] = ueds_game_controller_->SpawnDrone();
       if(!resSpawn){
         ROS_ERROR("Unreal: SpawnDrone FAIL");
-        is_unreal_used_ = false;
-        break;
+        ros::shutdown();
       }
 
       ROS_INFO("Unreal: %s spawn.", uav_names[i].c_str());
 
-      ueds_uavs_controllers_.push_back(std::make_unique<ueds_connector::DroneController>(LOCALHOST, port));
-      auto connect_result = ueds_uavs_controllers_[i]->Connect();
-      if (connect_result != 1) {
-        ROS_ERROR("Unreal: %s - Error connecting to drone controller. connect_result was %d", uav_names[i].c_str(), connect_result);
-        is_unreal_used_ = false;
-        break;
-      }
-      if(i == 0){
-        const auto [res, location] = ueds_uavs_controllers_[i]->GetLocation();
-        if (!res) {
-            ROS_ERROR("Unreal: %s - DroneError: getting location", uav_names[i].c_str());
-            return;
-        } else {
-            ueds_world_frame_ = location;
-            ROS_INFO("ueds_world_frame_: x[%lf] y[%lf] z[%lf]",ueds_world_frame_.x, ueds_world_frame_.y, ueds_world_frame_.z);
-        }
-      }
+      ueds_drone_controllers_.push_back(std::make_unique<DroneControllerRos>(nh_, uavs_[i], uav_names[i], port));
+    }  
 
-    }
-
-    timer_ueds_pose_ = nh_.createTimer(ros::Duration(1.0 / 50.0), std::bind(&MultirotorSimulator::uedsSetLocationAndRotationTimer, this));
-
-    timer_ueds_lidar_ = nh_.createTimer(ros::Duration(1.0 / 10.0), std::bind(&MultirotorSimulator::uedsPublishLidarTimer, this));
-    pub_lidar_ = nh_.advertise<sensor_msgs::PointCloud2>("ueds/"+uav_names[0]+"/lidar",1);
-
-    // timer_ueds_camera_ = nh_.createTimer(ros::Duration(1.0/1.0), std::bind(&MultirotorSimulator::uedsPublishCameraTimer, this));
-    // pub_camera_ = nh_.advertise<sensor_msgs::CompressedImage>("ueds/"+uav_names[0]+"/camera/image/compressed",1);
   }
 
 
@@ -286,10 +244,8 @@ void MultirotorSimulator::timerMain([[maybe_unused]] const ros::WallTimerEvent& 
 
   double simulation_step_size = 1.0 / _simulation_rate_;
 
-  // step the time
   sim_time_ = sim_time_ + ros::Duration(simulation_step_size);
 
-  std::unique_lock<std::mutex> lock(uavs_mutex);
 
   for (size_t i = 0; i < uavs_.size(); i++) {
     uavs_[i]->makeStep(simulation_step_size);
@@ -299,7 +255,6 @@ void MultirotorSimulator::timerMain([[maybe_unused]] const ros::WallTimerEvent& 
 
   handleCollisions();
   
-  lock.unlock();
 
 
 
@@ -469,151 +424,6 @@ void MultirotorSimulator::publishPoses(void) {
 
   ph_poses_.publish(pose_array);
 }
-
-void MultirotorSimulator::uedsSetLocationAndRotationTimer(void){
-  if(is_unreal_used_){
-    for (size_t i = 0; i < uavs_.size(); i++) {
-      std::unique_lock<std::mutex> lc(uavs_mutex);
-      MultirotorModel::State state = uavs_[i]->getState();
-      Eigen::Vector3d rpy = state.R.eulerAngles(0, 1, 2)*180/M_PI;
-      lc.unlock();
-
-      //ROS_WARN("uavPose: %lf %lf %lf", state.x.x(), state.x.y(), state.x.z());
-
-      std::unique_lock<std::mutex> lock(ueds_controllers_mutex);
-      const auto [res, teleportedTo, rotatedTo, isHit, impactPoint] = ueds_uavs_controllers_[i]->SetLocationAndRotation(ueds_connector::Coordinates(
-                                    ueds_world_frame_.x + state.x.x()*100,
-                                    ueds_world_frame_.y - state.x.y()*100,
-                                    ueds_world_frame_.z + state.x.z()*100),
-                                    ueds_connector::Rotation(-rpy.y(),-rpy.z(), -rpy.x()));
-      lock.unlock();
-
-      if(isHit){
-        lc.lock();
-        if(!uavs_[i]->hasCrashed()){
-          uavs_[i]->crash();
-        }
-        lc.unlock();
-      }
-
-    }
-  }
-}
-
-void MultirotorSimulator::uedsPublishLidarTimer()
-{ 
-  int i = 0;
- 
-  bool res;
-  std::vector<ueds_connector::LidarData> lidarData;
-  ueds_connector::Coordinates start;
-
-  std::unique_lock<std::mutex> lock(ueds_controllers_mutex);
-  std::tie(res, lidarData, start) = ueds_uavs_controllers_[i]->GetLidarData();
-  lock.unlock();
-
-  
-  if(!res){
-      ROS_ERROR("Unreal: [uav %d] - ERROR getLidarData", i);
-  }
-  else {
-  //ROS_INFO("Lidar Start: x[%lf] y[%lf] z[%lf]",x, start.y, start.z);
-  sensor_msgs::PointCloud2 pcl_msg;
-  
-  //Modifier to describe what the fields are.
-  sensor_msgs::PointCloud2Modifier modifier(pcl_msg);        
-  modifier.setPointCloud2Fields(4,
-      "x", 1, sensor_msgs::PointField::FLOAT32,
-      "y", 1, sensor_msgs::PointField::FLOAT32,
-      "z", 1, sensor_msgs::PointField::FLOAT32,
-      "intensity", 1, sensor_msgs::PointField::FLOAT32);
-  //Msg header
-  pcl_msg.header = std_msgs::Header();
-  pcl_msg.header.stamp = ros::Time::now();
-  pcl_msg.header.frame_id = uav_names[i] +"/world_origin";
-  pcl_msg.height = 1; //unordered 1D data array points cloud
-  pcl_msg.width = lidarData.size(); //360; //num_of_points
-  pcl_msg.is_dense = true;
-  //Total number of bytes per point
-  pcl_msg.point_step = 16;
-  pcl_msg.row_step = pcl_msg.point_step * pcl_msg.width;
-  pcl_msg.data.resize(pcl_msg.row_step);
-  //Iterators for PointCloud msg
-  sensor_msgs::PointCloud2Iterator<float> iterX(pcl_msg, "x");
-  sensor_msgs::PointCloud2Iterator<float> iterY(pcl_msg, "y");
-  sensor_msgs::PointCloud2Iterator<float> iterZ(pcl_msg, "z");
-  sensor_msgs::PointCloud2Iterator<float> iterIntensity(pcl_msg, "intensity");
-  
-  for(const ueds_connector::LidarData &i : lidarData){
-      tf::Vector3 dir = tf::Vector3(i.directionX, i.directionY, i.directionZ);
-      dir = dir.normalize() * (i.distance/100.0);
-      tf::Vector3 lidarTransform = tf::Vector3(
-          (start.x - ueds_world_frame_.x)/100,
-          (start.y - ueds_world_frame_.y)/100,
-          (start.z - ueds_world_frame_.z)/100
-      );
-      *iterX = lidarTransform.x() + dir.x();
-      *iterY = -lidarTransform.y() - dir.y(); //convert left-hand to right-hand coordinates
-      *iterZ = lidarTransform.z() + dir.z();
-      *iterIntensity = i.distance;
-      // ROS_WARN("UEDworldStart: %lf %lf %lf", ueds_world_frame_.x, ueds_world_frame_.y, ueds_world_frame_.z);
-      // ROS_WARN("UEDstartStart: %lf %lf %lf", start.x, start.y, start.z);
-      // ROS_WARN("UEDSlidarStart: %lf %lf %lf", lidarTransform.x(), lidarTransform.y(), lidarTransform.z());
-      //ROS_WARN("lidarStart: %f %f %f", *iterX, *iterY, *iterZ);
-      ++iterX;
-      ++iterY;
-      ++iterZ;
-      ++iterIntensity;
-  }
-  // *iterX = 10;
-  // *iterY = 0; //convert left-hand to right-hand coordinates
-  // *iterZ = 0;
-  // *iterIntensity = 10;
-  pub_lidar_.publish(pcl_msg);
-
-  }
-}
-
-void MultirotorSimulator::uedsPublishCameraTimer(){
-  int i = 0;
-
-  bool res;
-  std::vector<unsigned char> cameraData;
-  uint32_t size;
-
-  std::unique_lock<std::mutex> lock(ueds_controllers_mutex);
-  std::tie(res, cameraData, size) = ueds_uavs_controllers_[i]->GetCameraData();
-  lock.unlock();
-
-  // sensor_msgs::Image img_msg;
-  // img_msg.data.resize(size);
-  // std::copy(cameraData.begin(), cameraData.end(), std::back_inserter(img_msg.data));
-  if(res){
-    sensor_msgs::CompressedImage img_msg;
-    img_msg.header.stamp = ros::Time::now();
-    img_msg.format = "jpeg";
-
-    // std::vector<u_char> data;
-    //     // Example: Read JPEG binary data from a file
-    // std::ifstream file("/home/jan/Documents/BachelorThesis/ueds-connector/cmake-build-debug/examples/cli/testImage.jpeg", std::ios::binary);
-    
-    // u_char c;
-    // while (file >> c)
-    // {
-    //   data.push_back(c);
-    // }
-    // file.close();
-
-    img_msg.data = cameraData;
-    
-    pub_camera_.publish(img_msg);
-  }else{
-    ROS_ERROR("Unreal: can not send camera msg");
-  }
-
-}
-
-//}
 
 }  // namespace mrs_multirotor_simulator
 
