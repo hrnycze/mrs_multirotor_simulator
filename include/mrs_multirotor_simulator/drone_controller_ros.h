@@ -15,6 +15,11 @@
 #include "ueds-connector/drone-controller.h"
 
 
+
+#define USE_LIDAR true
+#define USE_CAMERA true
+
+
 //namespace ueds_uav_api
 namespace mrs_multirotor_simulator
 {
@@ -23,6 +28,10 @@ class DroneControllerRos
 {
 private:
     std::string uav_name_;
+
+    double simulation_rate_;
+
+    bool oneUAVsim_;
 
     std::shared_ptr<UavSystemRos> uav_system_;
 
@@ -35,7 +44,7 @@ private:
     ros::Publisher camera_pub_;
 public:
     DroneControllerRos();
-    DroneControllerRos(ros::NodeHandle& nh, std::shared_ptr<UavSystemRos> uav_system, const std::string name, int port);
+    DroneControllerRos(ros::NodeHandle& nh, double simulation_rate, std::shared_ptr<UavSystemRos> uav_system, const std::string name, int port, bool oneUAVsim);
 
     ~DroneControllerRos();
 

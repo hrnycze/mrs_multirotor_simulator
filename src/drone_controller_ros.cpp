@@ -4,7 +4,8 @@
 //namespace ueds_uav_api
 namespace mrs_multirotor_simulator
 {
-    DroneControllerRos::DroneControllerRos(ros::NodeHandle &nh, std::shared_ptr<UavSystemRos> uav_system, const std::string uav_name, int port) : uav_system_(uav_system), uav_name_(uav_name)
+    DroneControllerRos::DroneControllerRos(ros::NodeHandle &nh, double simulation_rate, std::shared_ptr<UavSystemRos> uav_system, const std::string uav_name, int port, bool oneUAVsim) 
+    : uav_system_(uav_system), uav_name_(uav_name), simulation_rate_(simulation_rate), oneUAVsim_(oneUAVsim)
     {
         drone_controller_ = std::make_unique<ueds_connector::DroneController>(LOCALHOST, port);
         auto connect_result = drone_controller_->Connect();
@@ -23,9 +24,12 @@ namespace mrs_multirotor_simulator
             }
         }
 
-        ueds_timer_ = nh.createTimer(ros::Duration(1.0 / 60.0), std::bind(&DroneControllerRos::uedsTimer, this));
-        lidar_pub_ = nh.advertise<sensor_msgs::PointCloud2>("ueds/"+uav_name_+"/lidar",10);
-        camera_pub_ = nh.advertise<sensor_msgs::CompressedImage>("ueds/"+uav_name_+"/camera/image/compressed",10);
+        ueds_timer_ = nh.createTimer(ros::Duration(1.0 / simulation_rate_), std::bind(&DroneControllerRos::uedsTimer, this));
+        if(USE_LIDAR)
+            lidar_pub_ = nh.advertise<sensor_msgs::PointCloud2>("ueds/"+uav_name_+"/lidar",10);
+
+        if(USE_CAMERA)   
+            camera_pub_ = nh.advertise<sensor_msgs::CompressedImage>("ueds/"+uav_name_+"/camera/image/compressed",10);
     }
 
     DroneControllerRos::~DroneControllerRos()
@@ -40,8 +44,11 @@ namespace mrs_multirotor_simulator
     void DroneControllerRos::uedsTimer()
     {
         uedsSetPositionAndRotation();
-        uedsPublishLidar();
-        uedsPubllishCamera();
+        if(USE_LIDAR)
+            uedsPublishLidar();
+
+        if(USE_CAMERA)    
+            uedsPubllishCamera();
     }
 
     void DroneControllerRos::uedsSetPositionAndRotation()
@@ -86,7 +93,14 @@ namespace mrs_multirotor_simulator
         //Msg header
         pcl_msg.header = std_msgs::Header();
         pcl_msg.header.stamp = ros::Time::now();
-        pcl_msg.header.frame_id = uav_name_ +"/world_origin";
+
+        if(oneUAVsim_){
+            pcl_msg.header.frame_id = uav_name_ +"/world_origin";
+        }else{
+            pcl_msg.header.frame_id = "simulator_origin";
+        }
+
+
         pcl_msg.height = 1; //unordered 1D data array points cloud
         pcl_msg.width = lidarData.size(); //360; //num_of_points
         pcl_msg.is_dense = true;

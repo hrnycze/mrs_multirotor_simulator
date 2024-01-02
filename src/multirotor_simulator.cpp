@@ -178,7 +178,13 @@ void MultirotorSimulator::onInit() {
       ros::shutdown();
     }
   
+    bool oneUAVsim = false;
+    if(uav_names.size() == 1){
+      oneUAVsim = true;
+    }
+
     for (size_t i = 0; i < uav_names.size(); i++) {
+    //for (size_t i = 0; i < 5; i++) {
       const auto [resSpawn, port] = ueds_game_controller_->SpawnDrone();
       if(!resSpawn){
         ROS_ERROR("Unreal: SpawnDrone FAIL");
@@ -187,7 +193,7 @@ void MultirotorSimulator::onInit() {
 
       ROS_INFO("Unreal: %s spawn.", uav_names[i].c_str());
 
-      ueds_drone_controllers_.push_back(std::make_unique<DroneControllerRos>(nh_, uavs_[i], uav_names[i], port));
+      ueds_drone_controllers_.push_back(std::make_unique<DroneControllerRos>(nh_, _simulation_rate_, uavs_[i], uav_names[i], port, oneUAVsim));
     }  
 
   }

@@ -34,11 +34,11 @@ uav_names: [
   "uav3",
   "uav4",
   "uav5",
-  "uav6",
-  "uav7",
-  "uav8",
-  "uav9",
-  "uav10",
+  # "uav6",
+  # "uav7",
+  # "uav8",
+  # "uav9",
+  # "uav10",
 ]
 
 uav1:
