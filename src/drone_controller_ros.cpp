@@ -57,6 +57,7 @@ namespace mrs_multirotor_simulator
       
       //ROS_WARN("uavPose: %lf %lf %lf", state.x.x(), state.x.y(), state.x.z());
 
+
       auto [roll, pitch, yaw] = mrs_lib::AttitudeConverter(state.R).getExtrinsicRPY();
 
       const auto [res, teleportedTo, rotatedTo, isHit, impactPoint] = drone_controller_->SetLocationAndRotation(ueds_connector::Coordinates(

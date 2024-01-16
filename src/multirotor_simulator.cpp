@@ -106,6 +106,9 @@ private:
   bool is_unreal_used_;
   std::unique_ptr<ueds_connector::GameModeController> ueds_game_controller_;
   std::vector<std::unique_ptr<DroneControllerRos>> ueds_drone_controllers_;
+
+  ros::Timer benchmarkFPS;
+  void uedsGetFPS();
 };
 
 //}
@@ -196,6 +199,7 @@ void MultirotorSimulator::onInit() {
       ueds_drone_controllers_.push_back(std::make_unique<DroneControllerRos>(nh_, _simulation_rate_, uavs_[i], uav_names[i], port, oneUAVsim));
     }  
 
+    benchmarkFPS = nh_.createTimer(ros::Duration(1.0/5.0), std::bind(&MultirotorSimulator::uedsGetFPS, this));
   }
 
 
@@ -430,6 +434,14 @@ void MultirotorSimulator::publishPoses(void) {
 
   ph_poses_.publish(pose_array);
 }
+
+void MultirotorSimulator::uedsGetFPS(){
+  auto [res, fps] = ueds_game_controller_->GetFps();
+
+  std::cout << "[UEds] FPS = " << fps << std::endl;
+
+}
+
 
 }  // namespace mrs_multirotor_simulator
 

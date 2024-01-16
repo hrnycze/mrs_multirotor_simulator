@@ -57,8 +57,7 @@ public:
     void uedsPublishLidar();
 
     void uedsPubllishCamera();
-
-    // void publishLidarCallback();
+    
 };
 
 
