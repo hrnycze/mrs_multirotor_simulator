@@ -26,10 +26,10 @@ namespace mrs_multirotor_simulator
 
         ueds_timer_ = nh.createTimer(ros::Duration(1.0 / simulation_rate_), std::bind(&DroneControllerRos::uedsTimer, this));
         if(USE_LIDAR)
-            lidar_pub_ = nh.advertise<sensor_msgs::PointCloud2>("ueds/"+uav_name_+"/lidar",10);
+            lidar_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/"+uav_name_+"/lidar/points",10);
 
         if(USE_CAMERA)   
-            camera_pub_ = nh.advertise<sensor_msgs::CompressedImage>("ueds/"+uav_name_+"/camera/image/compressed",10);
+            camera_pub_ = nh.advertise<sensor_msgs::CompressedImage>("/"+uav_name_+"/rgbd/image_raw/compressed",10);
     }
 
     DroneControllerRos::~DroneControllerRos()
@@ -94,13 +94,7 @@ namespace mrs_multirotor_simulator
         //Msg header
         pcl_msg.header = std_msgs::Header();
         pcl_msg.header.stamp = ros::Time::now();
-
-        if(oneUAVsim_){
-            pcl_msg.header.frame_id = uav_name_ +"/world_origin";
-        }else{
-            pcl_msg.header.frame_id = "simulator_origin";
-        }
-
+        pcl_msg.header.frame_id = uav_name_ + "/fcu";; // +"/world_origin";  
 
         pcl_msg.height = 1; //unordered 1D data array points cloud
         pcl_msg.width = lidarData.size(); //360; //num_of_points
@@ -118,28 +112,18 @@ namespace mrs_multirotor_simulator
         for(const ueds_connector::LidarData &i : lidarData){
             tf::Vector3 dir = tf::Vector3(i.directionX, i.directionY, i.directionZ);
             dir = dir.normalize() * (i.distance/100.0);
-            tf::Vector3 lidarTransform = tf::Vector3(
-                (start.x - ueds_world_frame_.x)/100,
-                (start.y - ueds_world_frame_.y)/100,
-                (start.z - ueds_world_frame_.z)/100
-            );
-            *iterX = lidarTransform.x() + dir.x();
-            *iterY = -lidarTransform.y() - dir.y(); //convert left-hand to right-hand coordinates
-            *iterZ = lidarTransform.z() + dir.z();
+
+            *iterX = dir.x();
+            *iterY = - dir.y(); //convert left-hand to right-hand coordinates
+            *iterZ = dir.z();
             *iterIntensity = i.distance;
-            // ROS_WARN("UEDworldStart: %lf %lf %lf", ueds_world_frame_.x, ueds_world_frame_.y, ueds_world_frame_.z);
-            // ROS_WARN("UEDstartStart: %lf %lf %lf", start.x, start.y, start.z);
-            // ROS_WARN("UEDSlidarStart: %lf %lf %lf", lidarTransform.x(), lidarTransform.y(), lidarTransform.z());
-            //ROS_WARN("lidarStart: %f %f %f", *iterX, *iterY, *iterZ);
+
             ++iterX;
             ++iterY;
             ++iterZ;
             ++iterIntensity;
         }
-        // *iterX = 10;
-        // *iterY = 0; //convert left-hand to right-hand coordinates
-        // *iterZ = 0;
-        // *iterIntensity = 10;
+
         lidar_pub_.publish(pcl_msg);
         }
     }
@@ -148,10 +132,11 @@ namespace mrs_multirotor_simulator
     {
         const auto [res, cameraData, size] = drone_controller_->GetCameraData();
 
-        if(true){
+        if(res){
             //ROS_WARN("Unreal: send camera msg");
             sensor_msgs::CompressedImage img_msg;
             img_msg.header.stamp = ros::Time::now();
+            img_msg.header.frame_id = "/" + uav_name_ + "/rgbd";
             img_msg.format = "jpeg";
 
             img_msg.data = cameraData;

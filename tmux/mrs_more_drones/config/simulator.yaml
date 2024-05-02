@@ -17,7 +17,7 @@ collisions:
 # randomization of the initial conditions around the desired spawn point
 randomization:
 
-  enabled: true
+  enabled: false
 
   bounds:
     x: 15.0
@@ -34,11 +34,11 @@ uav_names: [
   "uav3",
   "uav4",
   "uav5",
-  # "uav6",
-  # "uav7",
-  # "uav8",
-  # "uav9",
-  # "uav10",
+  "uav6",
+  "uav7",
+  "uav8",
+  "uav9",
+  "uav10",
 ]
 
 uav1:
