@@ -7,6 +7,11 @@ iterate_without_input: true
 individual_takeoff_platform:
   enabled: false
 
+ground:
+  enabled: true
+  z: 0.0 # [m]
+
+
 uav_names: [
   "uav1",
 ]

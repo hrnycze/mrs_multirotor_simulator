@@ -180,11 +180,6 @@ void MultirotorSimulator::onInit() {
       ROS_ERROR("Unreal: Error connecting to game mode controller. connect_result was %d", connect_result);
       ros::shutdown();
     }
-  
-    bool oneUAVsim = false;
-    if(uav_names.size() == 1){
-      oneUAVsim = true;
-    }
 
     for (size_t i = 0; i < uav_names.size(); i++) {
     //for (size_t i = 0; i < 5; i++) {
@@ -196,7 +191,7 @@ void MultirotorSimulator::onInit() {
 
       ROS_INFO("Unreal: %s spawn.", uav_names[i].c_str());
 
-      ueds_drone_controllers_.push_back(std::make_unique<DroneControllerRos>(nh_, _simulation_rate_, uavs_[i], uav_names[i], port, oneUAVsim));
+      ueds_drone_controllers_.push_back(std::make_unique<DroneControllerRos>(nh_, _simulation_rate_, uavs_[i], uav_names[i], port));
     }  
 
     benchmarkFPS = nh_.createTimer(ros::Duration(1.0/5.0), std::bind(&MultirotorSimulator::uedsGetFPS, this));

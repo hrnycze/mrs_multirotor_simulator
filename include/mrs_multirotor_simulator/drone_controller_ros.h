@@ -31,8 +31,6 @@ private:
 
     double simulation_rate_;
 
-    bool oneUAVsim_;
-
     std::shared_ptr<UavSystemRos> uav_system_;
 
     ueds_connector::Coordinates ueds_world_frame_;
@@ -44,7 +42,7 @@ private:
     ros::Publisher camera_pub_;
 public:
     DroneControllerRos();
-    DroneControllerRos(ros::NodeHandle& nh, double simulation_rate, std::shared_ptr<UavSystemRos> uav_system, const std::string name, int port, bool oneUAVsim);
+    DroneControllerRos(ros::NodeHandle& nh, double simulation_rate, std::shared_ptr<UavSystemRos> uav_system, const std::string name, int port);
 
     ~DroneControllerRos();
 

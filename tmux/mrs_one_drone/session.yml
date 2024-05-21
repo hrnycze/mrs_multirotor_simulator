@@ -41,7 +41,8 @@ windows:
   - rviz:
       layout: tiled
       panes:
-        - waitForControl; roslaunch mrs_uav_core rviz.launch
+        - waitForControl; rosrun rviz rviz -d ./rviz_1_ueds.rviz
+        # - waitForControl; roslaunch mrs_uav_core rviz.launch
         - waitForControl; roslaunch mrs_rviz_plugins load_robot.launch
         - waitForControl; waitForControl; roslaunch mrs_rviz_plugins rviz_interface.launch
   - layout:

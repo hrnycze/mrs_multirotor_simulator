@@ -4,8 +4,8 @@
 //namespace ueds_uav_api
 namespace mrs_multirotor_simulator
 {
-    DroneControllerRos::DroneControllerRos(ros::NodeHandle &nh, double simulation_rate, std::shared_ptr<UavSystemRos> uav_system, const std::string uav_name, int port, bool oneUAVsim) 
-    : uav_system_(uav_system), uav_name_(uav_name), simulation_rate_(simulation_rate), oneUAVsim_(oneUAVsim)
+    DroneControllerRos::DroneControllerRos(ros::NodeHandle &nh, double simulation_rate, std::shared_ptr<UavSystemRos> uav_system, const std::string uav_name, int port) 
+    : uav_system_(uav_system), uav_name_(uav_name), simulation_rate_(simulation_rate)
     {
         drone_controller_ = std::make_unique<ueds_connector::DroneController>(LOCALHOST, port);
         auto connect_result = drone_controller_->Connect();
